@@ -1,6 +1,28 @@
 # Flagship
 
+> Disclaimer: Flagship is experimental software. APIs, workflows, and behavior may change without notice, and it is not recommended for production-critical use without independent validation.
+
 Flagship is a repo-native experiment loop for AI-assisted product changes. You define an experiment once, run a daily workflow, and review PR-only updates that stay inside budget and policy limits.
+
+## High-Level Behavior
+
+```mermaid
+flowchart TD
+  A["Define experiment (objective, KPI, budget)"] --> B["Create mode writes manifest + state + workflow"]
+  B --> C["Generate initial control/treatment code behind feature flag"]
+  C --> D["Open PR #1 and require human review + merge"]
+  D --> E["Runtime serves variants and sends exposure/outcome events to PostHog"]
+  E --> F["Daily analyze loop reads metrics and runs deterministic policy gates"]
+  F --> G["final_action = HOLD"]
+  F --> H["final_action = SHIP"]
+  F --> I["final_action = ITERATE"]
+  I --> J["Generate follow-up treatment PR"]
+  J --> K["Human review + merge"]
+  K --> E
+  G --> L["Wait for next scheduled run"]
+  H --> L
+  L --> F
+```
 
 ## What It Does
 
