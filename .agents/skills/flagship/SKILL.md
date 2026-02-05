@@ -46,6 +46,8 @@ Required human-confirmed fields before any write:
 - Experiment definition (`experiment_id`/title and objective)
 - Primary KPI
 - Max budget (`max_budget_usd`)
+- MCP readiness for the selected feature-flag provider
+- GitHub Actions secret setup confirmation for MCP auth
 
 Write-blocked files until gate passes:
 
@@ -60,6 +62,28 @@ If any required field is missing or ambiguous:
 - Do not scaffold or update files yet.
 
 After all required fields are explicit, restate final values and get a clear human go-ahead, then write files.
+
+### MCP Readiness + GitHub Secret Guidance (Required During Brainstorm)
+
+During `create`, verify MCP readiness before writing files.
+
+1. Check local MCP install for the selected provider.
+2. If missing, provide setup commands and wait for human confirmation.
+3. Provide GitHub Actions API key setup instructions with exact secret names.
+4. Confirm completion before passing the pre-write gate.
+
+For PostHog, use this minimum guidance:
+
+- Local install check:
+  - `codex mcp list`
+  - `codex mcp get posthog --json`
+- If not installed:
+  - `npx @posthog/wizard mcp add`
+  - or `codex mcp add posthog --url "$POSTHOG_MCP_URL" --bearer-token-env-var POSTHOG_API_KEY`
+- GitHub Actions secrets:
+  - Add `POSTHOG_MCP_URL` (PostHog MCP server URL)
+  - Add `POSTHOG_API_KEY` (PostHog personal API key with required experiment read scopes)
+  - Ensure workflow environment/repo exposes those names unchanged.
 
 ### Brainstorm Conversation Style
 

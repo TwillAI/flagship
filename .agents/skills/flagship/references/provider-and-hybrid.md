@@ -40,6 +40,36 @@ headers = { Authorization = "Bearer ${POSTHOG_API_KEY}" }
 
 Manual step: user creates PostHog MCP-compatible personal API key.
 
+### Readiness Checklist (Use During Create Brainstorm)
+
+Treat MCP readiness as a required checkpoint before writing manifest/state/workflow files.
+
+Run:
+
+```bash
+codex mcp list
+codex mcp get posthog --json
+```
+
+If PostHog MCP is missing, guide setup with one of:
+
+```bash
+npx @posthog/wizard mcp add
+```
+
+or:
+
+```bash
+codex mcp add posthog --url "$POSTHOG_MCP_URL" --bearer-token-env-var POSTHOG_API_KEY
+```
+
+For GitHub Actions, instruct user to add these secrets:
+
+- `POSTHOG_MCP_URL`
+- `POSTHOG_API_KEY`
+
+Keep secret names aligned with workflow env/config references.
+
 ## 3) Hybrid Source of Truth Rules
 
 Treat PostHog and repo metadata as complementary authorities:
