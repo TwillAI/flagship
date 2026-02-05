@@ -78,8 +78,11 @@ For PostHog, use this minimum guidance:
   - `codex mcp list`
   - `codex mcp get posthog --json`
 - If not installed:
-  - `npx @posthog/wizard mcp add`
-  - or `codex mcp add posthog --url "$POSTHOG_MCP_URL" --bearer-token-env-var POSTHOG_API_KEY`
+  - US cloud (default): `codex mcp add posthog --url https://mcp.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY`
+  - EU cloud: `codex mcp add posthog --url https://mcp-eu.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY`
+  - OAuth fallback: `codex mcp add posthog --url https://mcp.posthog.com/mcp` then `codex mcp login posthog`
+  - Optional wizard bootstrap: `npx @posthog/wizard mcp add`
+  - Re-check: `codex mcp get posthog --json`
 - GitHub Actions secrets:
   - Add `POSTHOG_MCP_URL` (PostHog MCP server URL)
   - Add `POSTHOG_API_KEY` (PostHog personal API key with required experiment read scopes)
@@ -129,7 +132,10 @@ Rules:
    - Default to PostHog for MVP.
    - Add a TODO/plan for product SDK instrumentation in app code if missing.
    - Attempt PostHog MCP setup in developer environments with:
-     - `npx @posthog/wizard mcp add`
+     - US cloud (default): `codex mcp add posthog --url https://mcp.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY`
+     - EU cloud: `codex mcp add posthog --url https://mcp-eu.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY`
+     - Verify with: `codex mcp get posthog --json`
+     - Optional wizard bootstrap: `npx @posthog/wizard mcp add`
    - For GitHub Actions, configure PostHog MCP in Codex `config.toml` with:
      - `url = "${POSTHOG_MCP_URL}"`
      - `headers = { Authorization = "Bearer ${POSTHOG_API_KEY}" }`

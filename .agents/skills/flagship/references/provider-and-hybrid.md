@@ -21,7 +21,26 @@ If none is present, default to PostHog for Flagship MVP.
 
 ### Local development
 
-Preferred quick setup:
+Preferred Codex setup:
+
+```bash
+codex mcp add posthog --url https://mcp.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY
+```
+
+EU cloud variant:
+
+```bash
+codex mcp add posthog --url https://mcp-eu.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY
+```
+
+OAuth fallback:
+
+```bash
+codex mcp add posthog --url https://mcp.posthog.com/mcp
+codex mcp login posthog
+```
+
+Optional wizard bootstrap:
 
 ```bash
 npx @posthog/wizard mcp add
@@ -54,13 +73,19 @@ codex mcp get posthog --json
 If PostHog MCP is missing, guide setup with one of:
 
 ```bash
-npx @posthog/wizard mcp add
+codex mcp add posthog --url https://mcp.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY
 ```
 
 or:
 
 ```bash
-codex mcp add posthog --url "$POSTHOG_MCP_URL" --bearer-token-env-var POSTHOG_API_KEY
+codex mcp add posthog --url https://mcp-eu.posthog.com/mcp --bearer-token-env-var POSTHOG_API_KEY
+```
+
+Then verify:
+
+```bash
+codex mcp get posthog --json
 ```
 
 For GitHub Actions, instruct user to add these secrets:
