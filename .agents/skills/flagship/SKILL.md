@@ -37,6 +37,50 @@ Capture at minimum:
 
 Before finalizing manifest fields, determine feature-flag provider and MCP readiness.
 
+### Pre-Write Gate (Mandatory)
+
+Do not write any files until required parameters are clarified and explicitly specified by the human.
+
+Required human-confirmed fields before any write:
+
+- Experiment definition (`experiment_id`/title and objective)
+- Primary KPI
+- Max budget (`max_budget_usd`)
+
+Write-blocked files until gate passes:
+
+- `.flagship/experiments/<experiment_id>.yaml`
+- `.flagship/state/<experiment_id>.yaml`
+- `.github/workflows/flagship-loop.yml`
+
+If any required field is missing or ambiguous:
+
+- Continue brainstorming with targeted follow-up questions.
+- Summarize which fields are still missing.
+- Do not scaffold or update files yet.
+
+After all required fields are explicit, restate final values and get a clear human go-ahead, then write files.
+
+### Brainstorm Conversation Style
+
+Use a collaborative conversation, not a rigid intake form.
+
+- Ask one high-leverage question at a time.
+- Start with product and user outcome questions before technical setup details.
+- Reflect back what the user said in plain language before asking the next question.
+- Offer 2 to 3 concrete experiment directions with tradeoffs, then recommend one.
+- Avoid dumping a long required-field checklist in one message.
+- Use defaults where reasonable and ask only for missing technical IDs at the end.
+- Keep tone natural and concise; focus on decision quality, not template completion.
+
+Suggested question flow:
+
+1. Desired behavior change and target user segment.
+2. One success KPI and one failure condition.
+3. Smallest treatment change that can ship quickly.
+4. Guardrail risk that should stop or pause rollout.
+5. Technical IDs (PostHog project/cohorts/flag key/variants) only after direction is chosen.
+
 ### Workflow Generation
 
 Generate the GitHub Actions workflow from the skill template:
