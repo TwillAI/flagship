@@ -31,6 +31,13 @@ Normalize these values via `scripts/fetch_metrics.sh`.
 {
   "window_start_utc": "2026-02-05T00:00:00Z",
   "window_end_utc": "2026-02-06T00:00:00Z",
+  "experiment": {
+    "experiment_id": "9876",
+    "provider": "posthog",
+    "feature_flag_key": "onboarding.copy_variant",
+    "control_variant": "control",
+    "treatment_variant": "treatment"
+  },
   "variants": {
     "control": {
       "kpi": 0.214,

@@ -95,9 +95,22 @@ jobs:
 
       - name: Validate manifest
         run: |
-          ./.agents/skills/flagship/scripts/validate_manifest.sh \
-            --manifest "${{ matrix.experiment.path }}" \
-            --output ".flagship/tmp/${{ matrix.experiment.id }}-manifest-validation.json"
+          MANIFEST_PATH="${{ matrix.experiment.path }}"
+          VALIDATION_OUTPUT=".flagship/tmp/${{ matrix.experiment.id }}-manifest-validation.json"
+          PREVIOUS_MANIFEST_PATH=".flagship/tmp/${{ matrix.experiment.id }}-previous-manifest.yaml"
+          PREVIOUS_COMMIT="$(git log --follow --format=%H -- "$MANIFEST_PATH" | sed -n '2p')"
+
+          VALIDATE_ARGS=(
+            --manifest "$MANIFEST_PATH"
+            --output "$VALIDATION_OUTPUT"
+          )
+
+          if [[ -n "$PREVIOUS_COMMIT" ]]; then
+            git show "${PREVIOUS_COMMIT}:${MANIFEST_PATH}" > "$PREVIOUS_MANIFEST_PATH"
+            VALIDATE_ARGS+=(--previous "$PREVIOUS_MANIFEST_PATH")
+          fi
+
+          ./.agents/skills/flagship/scripts/validate_manifest.sh "${VALIDATE_ARGS[@]}"
 
       - name: Prepare Codex home with skill and MCP config
         run: |
@@ -126,6 +139,8 @@ jobs:
             - Use repo manifest as budget/policy truth.
             If posthog.experiment_id exists, prefer experiment-get and experiment-results-get via MCP.
             Query PostHog via MCP for last 24 hours and map results into the raw format expected by fetch_metrics.sh.
+            When available, include raw experiment metadata for drift checks:
+            experiment_id, provider, feature_flag_key, control_variant, treatment_variant.
             Write raw response JSON to:
             .flagship/tmp/${{ matrix.experiment.id }}-mcp-raw.json
             Then write recommendation JSON with fields:

@@ -169,6 +169,17 @@ for key, delta in (metrics.get("guardrail_deltas", {}) or {}).items():
                 f"Guardrail breach: {key} delta={float(delta):.6f} exceeds fallback limit={guardrail_max:.6f}"
             )
 
+drift_reasons = metrics.get("manifest_posthog_drift_reasons", [])
+if not isinstance(drift_reasons, list):
+    drift_reasons = [str(drift_reasons)]
+drift_detected = bool(metrics.get("manifest_posthog_drift_detected", False)) or bool(drift_reasons)
+if drift_detected:
+    if drift_reasons:
+        for reason in drift_reasons:
+            fail_reasons.append(f"Manifest/PostHog drift: {reason}")
+    else:
+        fail_reasons.append("Manifest/PostHog drift detected")
+
 agent_recommendation = str(recommendation_raw.get("agent_recommendation", "HOLD")).upper()
 if agent_recommendation not in allowed_recommendations:
     fail_reasons.append(f"Invalid recommendation: {agent_recommendation}")

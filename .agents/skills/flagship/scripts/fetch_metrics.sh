@@ -83,6 +83,64 @@ variants = raw.get("variants", {})
 control = variants.get("control", {})
 treatment = variants.get("treatment", {})
 
+manifest_feature_flag = manifest.get("feature_flag", {}) or {}
+manifest_posthog = manifest.get("posthog", {}) or {}
+raw_experiment = raw.get("experiment", {}) or raw.get("posthog_experiment", {}) or {}
+
+def read_nested(data, dotted):
+    cur = data
+    for key in dotted.split("."):
+        if not isinstance(cur, dict) or key not in cur:
+            return None
+        cur = cur[key]
+    return cur
+
+def read_raw_experiment(*candidates):
+    for key in candidates:
+        if "." in key:
+            value = read_nested(raw_experiment, key)
+        else:
+            value = raw_experiment.get(key)
+        if value is not None:
+            return value
+    return None
+
+drift_reasons = []
+
+def add_drift_reason(field_name, manifest_value, posthog_value):
+    if manifest_value is None or posthog_value is None:
+        return
+    if str(manifest_value) != str(posthog_value):
+        drift_reasons.append(
+            f"{field_name} mismatch (manifest={manifest_value!r}, posthog={posthog_value!r})"
+        )
+
+add_drift_reason(
+    "posthog.experiment_id",
+    manifest_posthog.get("experiment_id"),
+    read_raw_experiment("experiment_id", "id"),
+)
+add_drift_reason(
+    "feature_flag.provider",
+    manifest_feature_flag.get("provider"),
+    read_raw_experiment("provider"),
+)
+add_drift_reason(
+    "feature_flag.key",
+    manifest_feature_flag.get("key"),
+    read_raw_experiment("feature_flag_key", "feature_flag.key", "flag.key"),
+)
+add_drift_reason(
+    "feature_flag.control_variant",
+    manifest_feature_flag.get("control_variant"),
+    read_raw_experiment("control_variant", "variants.control.name"),
+)
+add_drift_reason(
+    "feature_flag.treatment_variant",
+    manifest_feature_flag.get("treatment_variant"),
+    read_raw_experiment("treatment_variant", "variants.treatment.name"),
+)
+
 control_guardrails = control.get("guardrails", {}) or {}
 treatment_guardrails = treatment.get("guardrails", {}) or {}
 
@@ -108,6 +166,8 @@ out = {
         "control": control_guardrails,
         "treatment": treatment_guardrails,
     },
+    "manifest_posthog_drift_detected": len(drift_reasons) > 0,
+    "manifest_posthog_drift_reasons": drift_reasons,
 }
 
 output_path.parent.mkdir(parents=True, exist_ok=True)
