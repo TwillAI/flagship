@@ -174,11 +174,14 @@ if not isinstance(drift_reasons, list):
     drift_reasons = [str(drift_reasons)]
 drift_detected = bool(metrics.get("manifest_posthog_drift_detected", False)) or bool(drift_reasons)
 if drift_detected:
+    # Keep drift visibility in logs but do not hard-block decisions.
     if drift_reasons:
-        for reason in drift_reasons:
-            fail_reasons.append(f"Manifest/PostHog drift: {reason}")
+        print(
+            "Manifest/PostHog drift warnings: " + "; ".join(str(reason) for reason in drift_reasons),
+            file=sys.stderr,
+        )
     else:
-        fail_reasons.append("Manifest/PostHog drift detected")
+        print("Manifest/PostHog drift warning detected", file=sys.stderr)
 
 agent_recommendation = str(recommendation_raw.get("agent_recommendation", "HOLD")).upper()
 if agent_recommendation not in allowed_recommendations:

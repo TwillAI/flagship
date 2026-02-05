@@ -79,13 +79,56 @@ window_end_arg = sys.argv[5]
 manifest = load_yaml(manifest_path)
 raw = json.loads(mcp_path.read_text())
 
-variants = raw.get("variants", {})
-control = variants.get("control", {})
-treatment = variants.get("treatment", {})
-
 manifest_feature_flag = manifest.get("feature_flag", {}) or {}
 manifest_posthog = manifest.get("posthog", {}) or {}
 raw_experiment = raw.get("experiment", {}) or raw.get("posthog_experiment", {}) or {}
+
+def resolve_variant(container, names):
+    if not isinstance(container, dict):
+        return {}
+
+    for name in names:
+        if name and isinstance(container.get(name), dict):
+            return container[name]
+
+    normalized = {str(name).lower() for name in names if name}
+    for key, value in container.items():
+        if str(key).lower() in normalized and isinstance(value, dict):
+            return value
+
+    return {}
+
+def resolve_variants(payload, control_name, treatment_name):
+    candidates = [
+        payload.get("variants"),
+        payload.get("cohorts"),
+        payload.get("results"),
+        (payload.get("metrics", {}) or {}).get("variants"),
+    ]
+
+    control_names = [control_name, "control", "baseline", "a"]
+    treatment_names = [treatment_name, "treatment", "variant", "b"]
+
+    control_variant = {}
+    treatment_variant = {}
+    for container in candidates:
+        if not isinstance(container, dict):
+            continue
+
+        if not control_variant:
+            control_variant = resolve_variant(container, control_names)
+        if not treatment_variant:
+            treatment_variant = resolve_variant(container, treatment_names)
+        if control_variant and treatment_variant:
+            break
+
+    return control_variant, treatment_variant
+
+control, treatment = resolve_variants(
+    raw,
+    manifest_feature_flag.get("control_variant"),
+    manifest_feature_flag.get("treatment_variant"),
+)
 
 def read_nested(data, dotted):
     cur = data
@@ -96,13 +139,16 @@ def read_nested(data, dotted):
     return cur
 
 def read_raw_experiment(*candidates):
-    for key in candidates:
-        if "." in key:
-            value = read_nested(raw_experiment, key)
-        else:
-            value = raw_experiment.get(key)
-        if value is not None:
-            return value
+    for source in [raw_experiment, raw]:
+        if not isinstance(source, dict):
+            continue
+        for key in candidates:
+            if "." in key:
+                value = read_nested(source, key)
+            else:
+                value = source.get(key)
+            if value is not None:
+                return value
     return None
 
 drift_reasons = []
@@ -141,8 +187,51 @@ add_drift_reason(
     read_raw_experiment("treatment_variant", "variants.treatment.name"),
 )
 
-control_guardrails = control.get("guardrails", {}) or {}
-treatment_guardrails = treatment.get("guardrails", {}) or {}
+def read_number(variant, keys, default=0.0):
+    if not isinstance(variant, dict):
+        return float(default)
+
+    for key in keys:
+        value = variant.get(key)
+        if value is not None:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                pass
+
+    nested_metrics = variant.get("metrics", {}) or {}
+    if isinstance(nested_metrics, dict):
+        for key in keys:
+            value = nested_metrics.get(key)
+            if value is not None:
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    pass
+
+    return float(default)
+
+def read_int(variant, keys, default=0):
+    return int(read_number(variant, keys, default=default))
+
+def read_guardrails(variant):
+    if not isinstance(variant, dict):
+        return {}
+
+    direct = variant.get("guardrails")
+    if isinstance(direct, dict):
+        return direct
+
+    nested_metrics = variant.get("metrics", {}) or {}
+    if isinstance(nested_metrics, dict):
+        nested_guardrails = nested_metrics.get("guardrails")
+        if isinstance(nested_guardrails, dict):
+            return nested_guardrails
+
+    return {}
+
+control_guardrails = read_guardrails(control)
+treatment_guardrails = read_guardrails(treatment)
 
 guardrail_names = set(control_guardrails.keys()) | set(treatment_guardrails.keys())
 guardrail_deltas = {}
@@ -157,10 +246,10 @@ out = {
     "experiment_id": manifest.get("experiment_id"),
     "window_start_utc": window_start_arg or raw.get("window_start_utc"),
     "window_end_utc": window_end_arg or raw.get("window_end_utc"),
-    "kpi_control": float(control.get("kpi", 0.0)),
-    "kpi_treatment": float(treatment.get("kpi", 0.0)),
-    "sample_size_control": int(control.get("sample_size", 0)),
-    "sample_size_treatment": int(treatment.get("sample_size", 0)),
+    "kpi_control": read_number(control, ["kpi", "primary_kpi", "value", "metric", "conversion_rate"]),
+    "kpi_treatment": read_number(treatment, ["kpi", "primary_kpi", "value", "metric", "conversion_rate"]),
+    "sample_size_control": read_int(control, ["sample_size", "n", "count", "users"]),
+    "sample_size_treatment": read_int(treatment, ["sample_size", "n", "count", "users"]),
     "guardrail_deltas": guardrail_deltas,
     "raw_guardrails": {
         "control": control_guardrails,

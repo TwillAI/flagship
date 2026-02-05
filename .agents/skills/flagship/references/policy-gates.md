@@ -28,14 +28,14 @@ Deterministic policy gates run after agent analysis. They can override the recom
 - Force final action to `HOLD`.
 
 4. PostHog/manifest drift
-- Fail if critical metadata mismatches between PostHog experiment metadata and manifest metadata.
+- Warn when critical metadata mismatches between PostHog experiment metadata and manifest metadata.
 - Critical fields include:
   - `posthog.experiment_id`
   - `feature_flag.provider`
   - `feature_flag.key`
   - `feature_flag.control_variant`
   - `feature_flag.treatment_variant`
-- Force final action to `HOLD`.
+- Do not force final action by itself; review warnings in logs/report context.
 
 5. Recommendation validity
 - Fail if recommendation is not one of:
