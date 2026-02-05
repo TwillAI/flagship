@@ -108,9 +108,9 @@ open_pr_number: null
 
 ## References
 
-- Skill workflow: `.agents/skills/flagship/SKILL.md`
-- Experiment schema: `.agents/skills/flagship/references/experiment-schema.md`
-- Policy gates: `.agents/skills/flagship/references/policy-gates.md`
-- PostHog MCP queries: `.agents/skills/flagship/references/posthog-mcp-queries.md`
-- Provider + hybrid model: `.agents/skills/flagship/references/provider-and-hybrid.md`
-- Advanced local scripts: `.agents/skills/flagship/scripts/`
+- Skill workflow: `skills/flagship/SKILL.md`
+- Experiment schema: `skills/flagship/references/experiment-schema.md`
+- Policy gates: `skills/flagship/references/policy-gates.md`
+- PostHog MCP queries: `skills/flagship/references/posthog-mcp-queries.md`
+- Provider + hybrid model: `skills/flagship/references/provider-and-hybrid.md`
+- Advanced local scripts: `skills/flagship/scripts/`

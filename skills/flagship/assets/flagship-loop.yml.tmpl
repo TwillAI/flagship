@@ -90,7 +90,7 @@ jobs:
 
       - name: Make scripts executable
         run: |
-          chmod +x .agents/skills/flagship/scripts/*.sh
+          chmod +x skills/flagship/scripts/*.sh
           mkdir -p .flagship/tmp
 
       - name: Validate manifest
@@ -110,13 +110,13 @@ jobs:
             VALIDATE_ARGS+=(--previous "$PREVIOUS_MANIFEST_PATH")
           fi
 
-          ./.agents/skills/flagship/scripts/validate_manifest.sh "${VALIDATE_ARGS[@]}"
+          ./skills/flagship/scripts/validate_manifest.sh "${VALIDATE_ARGS[@]}"
 
       - name: Prepare Codex home with skill and MCP config
         run: |
           export CODEX_HOME="$RUNNER_TEMP/codex-home"
           mkdir -p "$CODEX_HOME/skills/flagship"
-          cp -R .agents/skills/flagship/. "$CODEX_HOME/skills/flagship/"
+          cp -R skills/flagship/. "$CODEX_HOME/skills/flagship/"
           cat > "$CODEX_HOME/config.toml" <<EOF
           [mcp_servers.posthog]
           transport = "streamable_http"
@@ -152,7 +152,7 @@ jobs:
         run: |
           START="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
           END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          ./.agents/skills/flagship/scripts/fetch_metrics.sh \
+          ./skills/flagship/scripts/fetch_metrics.sh \
             --manifest "${{ matrix.experiment.path }}" \
             --mcp-output ".flagship/tmp/${{ matrix.experiment.id }}-mcp-raw.json" \
             --window-start "$START" \
@@ -199,7 +199,7 @@ jobs:
 
       - name: Evaluate policy
         run: |
-          ./.agents/skills/flagship/scripts/evaluate_policy.sh \
+          ./skills/flagship/scripts/evaluate_policy.sh \
             --manifest "${{ matrix.experiment.path }}" \
             --metrics ".flagship/tmp/${{ matrix.experiment.id }}-metrics.json" \
             --budget ".flagship/tmp/${{ matrix.experiment.id }}-budget.json" \
