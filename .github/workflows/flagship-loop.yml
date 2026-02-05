@@ -1,0 +1,233 @@
+name: Flagship Loop
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      experiments: ${{ steps.collect.outputs.experiments }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Collect active experiments
+        id: collect
+        run: |
+          python - <<'PY'
+          import glob
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def load_yaml(path: Path):
+              try:
+                  import yaml  # type: ignore
+                  return yaml.safe_load(path.read_text()) or {}
+              except ImportError:
+                  raw = subprocess.check_output(
+                      [
+                          "ruby",
+                          "-ryaml",
+                          "-rjson",
+                          "-e",
+                          "print JSON.dump(YAML.load_file(ARGV[0]))",
+                          str(path),
+                      ],
+                      text=True,
+                  )
+                  return json.loads(raw)
+
+          active = []
+          for path in sorted(glob.glob(".flagship/experiments/*.yaml")):
+              data = load_yaml(Path(path))
+              if data.get("status") == "active":
+                  active.append({
+                      "path": path,
+                      "id": data.get("experiment_id"),
+                  })
+          print(f"Discovered {len(active)} active experiments")
+          with open("experiments.json", "w", encoding="utf-8") as f:
+              json.dump(active, f)
+          PY
+          echo "experiments=$(cat experiments.json)" >> "$GITHUB_OUTPUT"
+
+  run-loop:
+    runs-on: ubuntu-latest
+    needs: discover
+    if: ${{ needs.discover.outputs.experiments != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        experiment: ${{ fromJson(needs.discover.outputs.experiments) }}
+    environment: flagship
+    env:
+      POSTHOG_MCP_URL: ${{ secrets.POSTHOG_MCP_URL }}
+      POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Make scripts executable
+        run: |
+          chmod +x .flagship/skill/scripts/*.sh
+          mkdir -p .flagship/tmp
+
+      - name: Validate manifest
+        run: |
+          ./.flagship/skill/scripts/validate_manifest.sh \
+            --manifest "${{ matrix.experiment.path }}" \
+            --output ".flagship/tmp/${{ matrix.experiment.id }}-manifest-validation.json"
+
+      - name: Prepare Codex home with skill and MCP config
+        run: |
+          export CODEX_HOME="$RUNNER_TEMP/codex-home"
+          mkdir -p "$CODEX_HOME/skills/flagship"
+          cp -R .flagship/skill/. "$CODEX_HOME/skills/flagship/"
+          cat > "$CODEX_HOME/config.toml" <<EOF
+          [mcp_servers.posthog]
+          transport = "streamable_http"
+          url = "${POSTHOG_MCP_URL}"
+          headers = { Authorization = "Bearer ${POSTHOG_API_KEY}" }
+          EOF
+          echo "CODEX_HOME=$CODEX_HOME" >> "$GITHUB_ENV"
+
+      - name: Analyze cohorts via Codex + PostHog MCP
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-home: ${{ env.CODEX_HOME }}
+          codex-args: "--full-auto --skip-git-repo-check"
+          prompt: |
+            Use the flagship skill.
+            Read manifest: ${{ matrix.experiment.path }}
+            Query PostHog via MCP for last 24 hours.
+            Write raw response JSON to:
+            .flagship/tmp/${{ matrix.experiment.id }}-mcp-raw.json
+            Then write recommendation JSON with fields:
+            agent_recommendation, confidence, reasoning_summary
+            to:
+            .flagship/tmp/${{ matrix.experiment.id }}-recommendation.json
+
+      - name: Normalize metrics
+        run: |
+          START="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          ./.flagship/skill/scripts/fetch_metrics.sh \
+            --manifest "${{ matrix.experiment.path }}" \
+            --mcp-output ".flagship/tmp/${{ matrix.experiment.id }}-mcp-raw.json" \
+            --window-start "$START" \
+            --window-end "$END" \
+            --output ".flagship/tmp/${{ matrix.experiment.id }}-metrics.json"
+
+      - name: Build budget snapshot
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def load_yaml(path: Path):
+              try:
+                  import yaml  # type: ignore
+                  return yaml.safe_load(path.read_text()) or {}
+              except ImportError:
+                  raw = subprocess.check_output(
+                      [
+                          "ruby",
+                          "-ryaml",
+                          "-rjson",
+                          "-e",
+                          "print JSON.dump(YAML.load_file(ARGV[0]))",
+                          str(path),
+                      ],
+                      text=True,
+                  )
+                  return json.loads(raw)
+
+          exp = "${{ matrix.experiment.id }}"
+          state_path = Path(f".flagship/state/{exp}.yaml")
+          state = load_yaml(state_path) if state_path.exists() else {}
+          remaining = float(state.get("budget_remaining_usd", 0.0))
+          out = {
+              "experiment_id": exp,
+              "budget_remaining_usd": remaining,
+          }
+          out_path = Path(f".flagship/tmp/{exp}-budget.json")
+          out_path.parent.mkdir(parents=True, exist_ok=True)
+          out_path.write_text(json.dumps(out, indent=2) + "\n")
+          PY
+
+      - name: Evaluate policy
+        run: |
+          ./.flagship/skill/scripts/evaluate_policy.sh \
+            --manifest "${{ matrix.experiment.path }}" \
+            --metrics ".flagship/tmp/${{ matrix.experiment.id }}-metrics.json" \
+            --budget ".flagship/tmp/${{ matrix.experiment.id }}-budget.json" \
+            --recommendation ".flagship/tmp/${{ matrix.experiment.id }}-recommendation.json" \
+            --output ".flagship/tmp/${{ matrix.experiment.id }}-decision.json"
+
+      - name: Load decision payload
+        id: decision
+        run: |
+          FINAL_ACTION="$(python - <<'PY'
+          import json
+          with open(".flagship/tmp/${{ matrix.experiment.id }}-decision.json", "r", encoding="utf-8") as f:
+              decision = json.load(f)
+          print(decision.get("final_action", "HOLD"))
+          PY
+          )"
+          echo "final_action=$FINAL_ACTION" >> "$GITHUB_OUTPUT"
+
+      - name: Iterate code when allowed
+        if: ${{ steps.decision.outputs.final_action == 'ITERATE' }}
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-home: ${{ env.CODEX_HOME }}
+          codex-args: "--full-auto --skip-git-repo-check"
+          prompt: |
+            Use the flagship skill in iterate mode.
+            Read experiment manifest: ${{ matrix.experiment.path }}
+            Read metrics: .flagship/tmp/${{ matrix.experiment.id }}-metrics.json
+            Read final decision: .flagship/tmp/${{ matrix.experiment.id }}-decision.json
+            Propose and implement treatment changes for this experiment.
+            Keep PR-only mutation policy.
+
+      - name: Persist report and ledger
+        run: |
+          TODAY="$(date -u +%F)"
+          mkdir -p ".flagship/reports/${TODAY}" ".flagship/ledger"
+          cp ".flagship/tmp/${{ matrix.experiment.id }}-decision.json" ".flagship/reports/${TODAY}/${{ matrix.experiment.id }}.json"
+          cat ".flagship/tmp/${{ matrix.experiment.id }}-decision.json" >> ".flagship/ledger/${{ matrix.experiment.id }}.jsonl"
+
+      - name: Update PR branch
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "flagship: daily loop for ${{ matrix.experiment.id }}"
+          title: "flagship: update ${{ matrix.experiment.id }}"
+          body: |
+            Automated Flagship loop output for `${{ matrix.experiment.id }}`.
+            Includes new decision report and any iterate-mode code updates.
+          branch: codex/flagship/${{ matrix.experiment.id }}
+          delete-branch: false
