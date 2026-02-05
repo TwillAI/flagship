@@ -46,6 +46,13 @@ Flagship helps you test product ideas without ad-hoc scripts. It combines cohort
 - Propose treatment iteration only when final action is `ITERATE`.
 - Write report + ledger entry and open/update the PR.
 
+## Workflow Diagrams
+
+- Create + initial A/B code PR: `docs/diagrams/01-create-and-initial-pr.md`
+- Live runtime cohort routing: `docs/diagrams/02-live-runtime-cohorts.md`
+- GitHub Actions analyze loop: `docs/diagrams/03-github-actions-analyze-loop.md`
+- Iterate PR loop: `docs/diagrams/04-iterate-pr-loop.md`
+
 ## Minimal Experiment Spec
 
 Use small manifests in README and keep full schema details in references.
