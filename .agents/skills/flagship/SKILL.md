@@ -14,6 +14,9 @@ Run one experiment lifecycle in three modes: `create`, `analyze`, `iterate`.
 - Enforce a cumulative per-experiment budget hard stop.
 - Keep repository mutations PR-only.
 - Run deterministic policy gates after analysis. Override to `HOLD` on any gate failure.
+- Use a hybrid source-of-truth model:
+  - PostHog experiment object is authoritative for exposure assignment and experiment results.
+  - Repository manifest/state is authoritative for budget, guardrails, rollout policy, and PR workflow.
 
 ## Create Mode
 
@@ -32,11 +35,39 @@ Capture at minimum:
 - Feature flag key with control/treatment variants
 - PostHog project and cohort ids
 
+Before finalizing manifest fields, determine feature-flag provider and MCP readiness.
+
+### Provider Detection and MCP Bootstrap
+
+1. Detect current feature-flag system from repository code/config:
+   - Check dependencies and references for providers such as PostHog, LaunchDarkly, Statsig, Split, or homegrown flags.
+2. If a provider is already in use:
+   - Reuse that provider for flag rollout in this experiment.
+   - Keep provider metadata in the manifest.
+3. If no provider is clearly installed:
+   - Default to PostHog for MVP.
+   - Add a TODO/plan for product SDK instrumentation in app code if missing.
+   - Attempt PostHog MCP setup in developer environments with:
+     - `npx @posthog/wizard mcp add`
+   - For GitHub Actions, configure PostHog MCP in Codex `config.toml` with:
+     - `url = "${POSTHOG_MCP_URL}"`
+     - `headers = { Authorization = "Bearer ${POSTHOG_API_KEY}" }`
+   - Treat API key creation as manual setup owned by the user.
+
+### Hybrid Data Model Requirements
+
+- Persist PostHog experiment identifiers in manifest metadata (for example `posthog.experiment_id`) once created.
+- Persist feature-flag provider metadata (for example `feature_flag.provider`).
+- On each analyze run:
+  - Read results from PostHog experiment APIs/tools.
+  - Compare critical settings between PostHog and manifest.
+  - If drift is detected, set final action to `HOLD` and require review.
+
 Use schema rules from `references/experiment-schema.md`.
 
 ## Analyze Mode
 
-Load the experiment manifest and read cohort metrics via PostHog MCP.
+Load the experiment manifest and read experiment metrics via PostHog MCP.
 Normalize metrics into one JSON document using `scripts/fetch_metrics.sh`.
 Generate an agent recommendation JSON containing:
 
@@ -89,3 +120,4 @@ Use references:
 - `references/experiment-schema.md`
 - `references/posthog-mcp-queries.md`
 - `references/policy-gates.md`
+- `references/provider-and-hybrid.md`

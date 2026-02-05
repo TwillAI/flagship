@@ -22,11 +22,13 @@ guardrails:
     max_degradation_pct: 1.0
 max_budget_usd: 1000
 feature_flag:
+  provider: posthog
   key: onboarding.copy_variant
   control_variant: control
   treatment_variant: treatment
 posthog:
   project_id: "12345"
+  experiment_id: "9876"
   cohorts:
     control: "1122"
     treatment: "3344"
@@ -50,6 +52,15 @@ After first commit, these fields must not change:
 - `objective`
 - `primary_kpi`
 - `max_budget_usd`
+
+## Hybrid Linkage Fields
+
+Use these fields to connect repository state with native PostHog experiment state:
+
+- `feature_flag.provider` (recommended, typically `posthog`)
+- `feature_flag.key`
+- `posthog.project_id`
+- `posthog.experiment_id` (recommended once created)
 
 ## State Path
 

@@ -90,12 +90,12 @@ jobs:
 
       - name: Make scripts executable
         run: |
-          chmod +x .flagship/skill/scripts/*.sh
+          chmod +x .agents/skills/flagship/scripts/*.sh
           mkdir -p .flagship/tmp
 
       - name: Validate manifest
         run: |
-          ./.flagship/skill/scripts/validate_manifest.sh \
+          ./.agents/skills/flagship/scripts/validate_manifest.sh \
             --manifest "${{ matrix.experiment.path }}" \
             --output ".flagship/tmp/${{ matrix.experiment.id }}-manifest-validation.json"
 
@@ -103,7 +103,7 @@ jobs:
         run: |
           export CODEX_HOME="$RUNNER_TEMP/codex-home"
           mkdir -p "$CODEX_HOME/skills/flagship"
-          cp -R .flagship/skill/. "$CODEX_HOME/skills/flagship/"
+          cp -R .agents/skills/flagship/. "$CODEX_HOME/skills/flagship/"
           cat > "$CODEX_HOME/config.toml" <<EOF
           [mcp_servers.posthog]
           transport = "streamable_http"
@@ -121,7 +121,11 @@ jobs:
           prompt: |
             Use the flagship skill.
             Read manifest: ${{ matrix.experiment.path }}
-            Query PostHog via MCP for last 24 hours.
+            Follow the hybrid source-of-truth model:
+            - Use PostHog experiment object as analytics truth.
+            - Use repo manifest as budget/policy truth.
+            If posthog.experiment_id exists, prefer experiment-get and experiment-results-get via MCP.
+            Query PostHog via MCP for last 24 hours and map results into the raw format expected by fetch_metrics.sh.
             Write raw response JSON to:
             .flagship/tmp/${{ matrix.experiment.id }}-mcp-raw.json
             Then write recommendation JSON with fields:
@@ -133,7 +137,7 @@ jobs:
         run: |
           START="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
           END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          ./.flagship/skill/scripts/fetch_metrics.sh \
+          ./.agents/skills/flagship/scripts/fetch_metrics.sh \
             --manifest "${{ matrix.experiment.path }}" \
             --mcp-output ".flagship/tmp/${{ matrix.experiment.id }}-mcp-raw.json" \
             --window-start "$START" \
@@ -180,7 +184,7 @@ jobs:
 
       - name: Evaluate policy
         run: |
-          ./.flagship/skill/scripts/evaluate_policy.sh \
+          ./.agents/skills/flagship/scripts/evaluate_policy.sh \
             --manifest "${{ matrix.experiment.path }}" \
             --metrics ".flagship/tmp/${{ matrix.experiment.id }}-metrics.json" \
             --budget ".flagship/tmp/${{ matrix.experiment.id }}-budget.json" \

@@ -10,7 +10,7 @@ Flagship is a repo-native experimentation loop for an AI SWE workflow:
 
 ## What this repo contains
 
-- Skill package: `.flagship/skill/`
+- Skill package: `.agents/skills/flagship/`
 - Experiment manifests: `.flagship/experiments/`
 - Experiment runtime state: `.flagship/state/`
 - Daily reports: `.flagship/reports/<yyyy-mm-dd>/`
@@ -27,11 +27,65 @@ Flagship is a repo-native experimentation loop for an AI SWE workflow:
 ## How to Use Flagship
 
 1. Configure GitHub environment secrets (`OPENAI_API_KEY`, `POSTHOG_API_KEY`, `POSTHOG_MCP_URL`).
-2. In Codex, ask to create a new Flagship experiment.
+2. In Codex, ask to create a new Flagship experiment. The skill should detect your current feature-flag provider first.
 3. Commit the generated manifest in `.flagship/experiments/` and state file in `.flagship/state/`.
 4. Trigger `.github/workflows/flagship-loop.yml` manually once, then rely on daily schedule.
 5. Review the PR created or updated on `codex/flagship/<experiment_id>`.
 6. Check outputs in `.flagship/reports/<yyyy-mm-dd>/` and `.flagship/ledger/`.
+
+## High-Level Flow (with Example)
+
+Think of Flagship as a daily experiment operator that loops between code and data.
+
+```text
+You define experiment -> GitHub Action runs daily -> Codex analyzes cohorts (PostHog MCP)
+-> Policy gates decide safe action -> Codex proposes treatment updates (if allowed)
+-> PR is updated -> You review/merge -> Repeat until winner or stop
+```
+
+Example projection:
+
+1. You create `onboarding-copy-v1` with a `$1000` budget and KPI `activation_24h_rate`.
+2. Day 1 run: sample is too low, policy returns `HOLD`.
+3. Day 3 run: enough traffic, treatment outperforms control, policy returns `ITERATE`, PR is updated with copy improvements.
+4. Day 5 run: treatment still wins and guardrails are healthy, PR gets another safe iteration.
+5. Day 8 run: budget is nearly exhausted or KPI plateaus, final action becomes `KEEP_TREATMENT` or `STOP`.
+6. You merge the final PR and mark experiment status accordingly.
+
+## Provider Detection and MCP Setup
+
+Flagship should not blindly assume PostHog flags on day 1.
+
+During experiment creation, the skill should:
+
+1. Inspect the repo for an existing feature-flag provider.
+2. Reuse existing provider if clearly present.
+3. Default to PostHog only if no provider is detected.
+
+If defaulting to PostHog:
+
+- Local/dev setup can use:
+  - `npx @posthog/wizard mcp add`
+- GitHub Actions uses API-key auth in Codex MCP config (already handled in the workflow).
+- The only manual step is creating and storing a PostHog MCP-compatible API key as `POSTHOG_API_KEY`.
+
+## Hybrid Source of Truth
+
+Flagship uses a hybrid model, not filesystem-only and not PostHog-only.
+
+- PostHog experiment object is the source of truth for:
+  - exposure assignment
+  - experiment results and lifecycle in PostHog
+- Repo manifest/state is the source of truth for:
+  - budget cap and spend tracking
+  - guardrail policy gates
+  - PR workflow and automation state
+
+Practical rule:
+
+1. Create or link a PostHog experiment and store IDs in manifest.
+2. Read results from PostHog in daily runs.
+3. If critical settings drift between PostHog and manifest, force `HOLD`.
 
 ## GitHub setup
 
@@ -74,11 +128,13 @@ guardrails:
     max_degradation_pct: 1.0
 max_budget_usd: 1000
 feature_flag:
+  provider: posthog
   key: onboarding.copy_variant
   control_variant: control
   treatment_variant: treatment
 posthog:
   project_id: "12345"
+  experiment_id: "9876"
   cohorts:
     control: "1122"
     treatment: "3344"
@@ -130,19 +186,19 @@ Per active experiment, the loop:
 ## Script usage (local)
 
 ```bash
-chmod +x .flagship/skill/scripts/*.sh
+chmod +x .agents/skills/flagship/scripts/*.sh
 ```
 
 Validate manifest:
 
 ```bash
-.flagship/skill/scripts/validate_manifest.sh --manifest .flagship/experiments/onboarding-copy-v1.yaml
+.agents/skills/flagship/scripts/validate_manifest.sh --manifest .flagship/experiments/onboarding-copy-v1.yaml
 ```
 
 Normalize metrics:
 
 ```bash
-.flagship/skill/scripts/fetch_metrics.sh \
+.agents/skills/flagship/scripts/fetch_metrics.sh \
   --manifest .flagship/experiments/onboarding-copy-v1.yaml \
   --mcp-output /path/to/raw-mcp.json \
   --output /tmp/metrics.json
@@ -151,7 +207,7 @@ Normalize metrics:
 Evaluate policy:
 
 ```bash
-.flagship/skill/scripts/evaluate_policy.sh \
+.agents/skills/flagship/scripts/evaluate_policy.sh \
   --manifest .flagship/experiments/onboarding-copy-v1.yaml \
   --metrics /tmp/metrics.json \
   --budget /tmp/budget.json \
@@ -161,7 +217,8 @@ Evaluate policy:
 
 ## References
 
-- Skill instructions: `.flagship/skill/SKILL.md`
-- Schema reference: `.flagship/skill/references/experiment-schema.md`
-- PostHog MCP flow: `.flagship/skill/references/posthog-mcp-queries.md`
-- Policy gates: `.flagship/skill/references/policy-gates.md`
+- Skill instructions: `.agents/skills/flagship/SKILL.md`
+- Schema reference: `.agents/skills/flagship/references/experiment-schema.md`
+- PostHog MCP flow: `.agents/skills/flagship/references/posthog-mcp-queries.md`
+- Policy gates: `.agents/skills/flagship/references/policy-gates.md`
+- Provider + hybrid model: `.agents/skills/flagship/references/provider-and-hybrid.md`
