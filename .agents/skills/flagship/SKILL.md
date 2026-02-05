@@ -24,7 +24,7 @@ Run a structured brainstorm, then write files:
 
 - Manifest: `.flagship/experiments/<experiment_id>.yaml`
 - State: `.flagship/state/<experiment_id>.yaml`
-- Optional workflow update: `.github/workflows/flagship-loop.yml`
+- Generated workflow: `.github/workflows/flagship-loop.yml`
 
 Capture at minimum:
 
@@ -36,6 +36,19 @@ Capture at minimum:
 - PostHog project and cohort ids
 
 Before finalizing manifest fields, determine feature-flag provider and MCP readiness.
+
+### Workflow Generation
+
+Generate the GitHub Actions workflow from the skill template:
+
+- Template source: `assets/flagship-loop.yml.tmpl`
+- Target output: `.github/workflows/flagship-loop.yml`
+
+Rules:
+
+1. If target workflow does not exist, create it from the template.
+2. If target workflow exists, update it to preserve custom repository details while keeping the core Flagship loop behavior.
+3. Do not treat the workflow file in the repository as static reference documentation; the agent should own generating/updating it.
 
 ### Provider Detection and MCP Bootstrap
 

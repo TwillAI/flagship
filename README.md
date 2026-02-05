@@ -15,7 +15,8 @@ Flagship is a repo-native experimentation loop for an AI SWE workflow:
 - Experiment runtime state: `.flagship/state/`
 - Daily reports: `.flagship/reports/<yyyy-mm-dd>/`
 - Decision ledger: `.flagship/ledger/`
-- Global scheduler workflow: `.github/workflows/flagship-loop.yml`
+- Workflow template: `.agents/skills/flagship/assets/flagship-loop.yml.tmpl`
+- Generated scheduler workflow: `.github/workflows/flagship-loop.yml`
 
 ## Prerequisites
 
@@ -29,7 +30,7 @@ Flagship is a repo-native experimentation loop for an AI SWE workflow:
 1. Configure GitHub environment secrets (`OPENAI_API_KEY`, `POSTHOG_API_KEY`, `POSTHOG_MCP_URL`).
 2. In Codex, ask to create a new Flagship experiment. The skill should detect your current feature-flag provider first.
 3. Commit the generated manifest in `.flagship/experiments/` and state file in `.flagship/state/`.
-4. Trigger `.github/workflows/flagship-loop.yml` manually once, then rely on daily schedule.
+4. Let the skill generate `.github/workflows/flagship-loop.yml` from the template, then trigger it manually once.
 5. Review the PR created or updated on `codex/flagship/<experiment_id>`.
 6. Check outputs in `.flagship/reports/<yyyy-mm-dd>/` and `.flagship/ledger/`.
 
@@ -97,6 +98,15 @@ Create a GitHub Environment named `flagship` and add secrets:
 
 The workflow uses environment-scoped secrets by default.
 
+## Workflow Template and Generation
+
+Flagship treats the GitHub Action as generated project code.
+
+- Template lives in the skill: `.agents/skills/flagship/assets/flagship-loop.yml.tmpl`
+- Generated workflow target: `.github/workflows/flagship-loop.yml`
+
+During `create` mode, the agent should generate or update the target workflow from the template.
+
 ## Create an experiment with Codex
 
 In Codex, run a prompt like:
@@ -157,7 +167,7 @@ open_pr_number: null
 
 ## Run the loop
 
-The workflow is scheduled daily and can also be started manually from GitHub Actions:
+The generated workflow is scheduled daily and can also be started manually from GitHub Actions:
 
 - Workflow file: `.github/workflows/flagship-loop.yml`
 - Branch pattern for updates: `codex/flagship/<experiment_id>`
