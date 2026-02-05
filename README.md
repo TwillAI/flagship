@@ -8,20 +8,14 @@ Flagship is a repo-native experiment loop for AI-assisted product changes. You d
 
 ```mermaid
 flowchart TD
-  A["Define experiment (objective, KPI, budget)"] --> B["Create mode writes manifest + state + workflow"]
-  B --> C["Generate initial control/treatment code behind feature flag"]
-  C --> D["Open PR #1 and require human review + merge"]
-  D --> E["Runtime serves variants and sends exposure/outcome events to PostHog"]
-  E --> F["Daily analyze loop reads metrics and runs deterministic policy gates"]
-  F --> G["final_action = HOLD"]
-  F --> H["final_action = SHIP"]
-  F --> I["final_action = ITERATE"]
-  I --> J["Generate follow-up treatment PR"]
-  J --> K["Human review + merge"]
-  K --> E
-  G --> L["Wait for next scheduled run"]
-  H --> L
-  L --> F
+  A["Define experiment (objective, KPI, budget)"] --> B["Create initial change and open PR"]
+  B --> C["Human review and merge"]
+  C --> D["Runtime serves variants and records events in PostHog"]
+  D --> E["Daily analyze loop runs metrics + policy gates"]
+  E --> F{"Decision"}
+  F -->|"HOLD / SHIP"| D
+  F -->|"ITERATE"| G["Generate follow-up PR and merge"]
+  G --> D
 ```
 
 ## What It Does
