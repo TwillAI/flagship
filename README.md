@@ -2,7 +2,8 @@
 
 > Disclaimer: Flagship is experimental software. APIs, workflows, and behavior may change without notice, and it is not recommended for production-critical use without independent validation.
 
-Flagship is a repo-native experiment loop for AI-assisted product changes. You define an experiment once, run a daily workflow, and review PR-only updates that stay inside budget and policy limits.
+Flagship is an **Agent Skill** (`skills/flagship/SKILL.md`) that helps teams run product experiments faster and with less risk by using feature flags and cohort analysis.
+Given a budget, an agent using this skill runs the experiment, analyzes cohort results, and keeps the option that performs best.
 
 ## High-Level Behavior
 
